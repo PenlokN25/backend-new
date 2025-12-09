@@ -57,8 +57,10 @@ class UserRegistrationView(generics.CreateAPIView):
 
 class Usergetrole(APIView):
     def get(self,request):
-        items=models.User.objects.filter(role=models.User.Role.OWNER)
-        userdetail=serializer.UserDetailSerializer(items,many=True)
+        faceidowner=request.query_params.get('faceid', None)
+        items=models.User.objects.get(face_id=faceidowner)
+        # items=models.User.objects.filter(role=models.User.Role.OWNER)
+        userdetail=serializer.UserDetailSerializer(items)
         return Response(userdetail.data,status=status.HTTP_200_OK)
 
 

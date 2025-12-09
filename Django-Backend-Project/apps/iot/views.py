@@ -5,7 +5,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import IoTEventSerializer, IoTIngestSerializer
+from .serializers import IoTEventSerializer, IoTIngestSerializer, LockerSensorEventSerializer
 
 
 class DeviceEventIngestView(APIView):
@@ -15,6 +15,24 @@ class DeviceEventIngestView(APIView):
     def post(self, request, *args, **kwargs):
         _require_device_token(request)
         serializer = IoTIngestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        event = serializer.save()
+        output = IoTEventSerializer(event, context={'request': request})
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+
+class LockerSensorEventView(APIView):
+    """
+    Ingest hardware signals for locker door/package detection.
+    Intended for lockers 1 and 3 where both sensors agree before sending.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(request=LockerSensorEventSerializer, responses=IoTEventSerializer)
+    def post(self, request, *args, **kwargs):
+        _require_device_token(request)
+        serializer = LockerSensorEventSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         event = serializer.save()
         output = IoTEventSerializer(event, context={'request': request})

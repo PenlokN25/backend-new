@@ -31,3 +31,36 @@ class IoTIngestSerializer(serializers.Serializer):
             payload=validated_data['payload'],
         )
 
+
+class LockerSensorEventSerializer(serializers.Serializer):
+    class LockerEvent(serializers.ChoiceField):
+        def __init__(self, **kwargs):
+            super().__init__(
+                choices=['door_closed', 'package_detected'],
+                **kwargs,
+            )
+
+        def to_internal_value(self, data):
+            value = super().to_internal_value(data)
+            return value.upper()
+
+    locker_number = serializers.ChoiceField(choices=['1', '3'])
+    event = LockerEvent()
+    timestamp = serializers.DateTimeField(required=False)
+
+    def create(self, validated_data):
+        locker_number = validated_data['locker_number']
+        event = validated_data['event']
+        timestamp = validated_data.get('timestamp')
+
+        payload = {
+            'event': f'LOCKER_{event}',
+            'locker_number': locker_number,
+        }
+        if timestamp:
+            payload['timestamp'] = timestamp.isoformat()
+
+        return IoTEvent.objects.create(
+            event_type=IoTEvent.EventType.DEVICE,
+            payload=payload,
+        )

@@ -20,6 +20,21 @@ EVENT_MESSAGES = {
     'LOCKER_ACCESS_DENIED': 'Percobaan OTP gagal.',
 }
 
+OWNER_BROADCAST_EVENTS = {'LOCKER_DOOR_CLOSED', 'LOCKER_PACKAGE_DETECTED'}
+
+
+def _locker_label(payload: dict) -> str:
+    locker = payload.get('locker_number') or payload.get('locker') or payload.get('locker_id')
+    return locker or '?'
+
+
+def _resolve_message(event_key: str, payload: dict) -> str | None:
+    if event_key == 'LOCKER_DOOR_CLOSED':
+        return f"Pintu loker {_locker_label(payload)} sudah tertutup."
+    if event_key == 'LOCKER_PACKAGE_DETECTED':
+        return f"Paket terdeteksi di loker {_locker_label(payload)}."
+    return EVENT_MESSAGES.get(event_key)
+
 
 @receiver(post_save, sender=IoTEvent)
 def notify_priority_events(sender, instance: IoTEvent, created: bool, **kwargs) -> None:
@@ -28,16 +43,21 @@ def notify_priority_events(sender, instance: IoTEvent, created: bool, **kwargs) 
 
     payload = instance.payload or {}
     event_key = (payload.get('event') or instance.event_type or '').upper()
-    message = EVENT_MESSAGES.get(event_key)
+    message = _resolve_message(event_key, payload)
 
     if not message:
         return
 
     target_ids = []
+    User = get_user_model()
+    if event_key in OWNER_BROADCAST_EVENTS:
+        target_ids = list(
+            User.objects.filter(role=User.Role.OWNER).values_list('id', flat=True)
+        )
+
     if instance.user_id:
         target_ids.append(instance.user_id)
     if not target_ids:
-        User = get_user_model()
         target_ids = list(User.objects.filter(is_superuser=True).values_list('id', flat=True))
 
     push_notification_task(
