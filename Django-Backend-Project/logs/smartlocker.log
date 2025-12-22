@@ -1,2 +1,3 @@
-[2025-11-19 07:07:41,726] INFO django.utils.autoreload: Watching for file changes with StatReloader
-[2025-11-19 09:52:41,541] INFO django.utils.autoreload: Watching for file changes with StatReloader
+[2025-12-16 15:10:35,521] INFO django.utils.autoreload: Watching for file changes with StatReloader
+[2025-12-16 15:11:01,300] INFO django.utils.autoreload: /home/pi/penlock/software/Django-Backend-Project/apps/facerecognition/views.py changed, reloading.
+[2025-12-16 15:11:02,005] INFO django.utils.autoreload: Watching for file changes with StatReloader

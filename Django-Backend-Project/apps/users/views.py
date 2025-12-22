@@ -56,6 +56,7 @@ class UserRegistrationView(generics.CreateAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class Usergetrole(APIView):
+    permission_classes=(permissions.AllowAny,)
     def get(self,request):
         faceidowner=request.query_params.get('faceid', None)
         items=models.User.objects.get(face_id=faceidowner)

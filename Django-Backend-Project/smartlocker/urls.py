@@ -24,6 +24,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/users/', include('apps.users.urls')),
     path('api/v1/facerecognition/', include('apps.facerecognition.urls')),
+    # path('face/', include('apps.facerecognition.urls')),  # Backward compatibility for legacy clients
     path('api/v1/lockers/', include('apps.lockers.urls')),
     path('api/v1/packages/', include('apps.lockers.package_urls')),
     path('api/v1/marketplace/', include('apps.marketplace.urls')),

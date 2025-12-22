@@ -4,11 +4,11 @@ from datetime import datetime
 from django.shortcuts import render
 from PIL import Image
 from django.core.files.base import ContentFile
-from rest_framework import status
+from rest_framework import status,permissions
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from django.conf import settings
 from apps.users.models import User
 
 from . import models, serializer
@@ -92,9 +92,11 @@ def non_max_suppression_fast(boxes, overlapThresh=0.3):
 def train_or_update_user_data(training_dir, model_save_path, target_user, target_label):
     print(target_user)
     print(target_label)
+    base_dir=settings.BASE_DIR
+
     face_recognizer = cv2.face.LBPHFaceRecognizer.create()
     haar_name='haarcascade_frontalface_default.xml'
-    haar_loc=os.path.join('hasiltraining',haar_name)
+    haar_loc=os.path.join('apps','hasiltraining',haar_name)
     face_cascade = cv2.CascadeClassifier(haar_loc)
 
     log_file = f"{target_user}_trained_images.log"
@@ -129,14 +131,24 @@ def train_or_update_user_data(training_dir, model_save_path, target_user, target
 
     if faces:
         # Update model dengan data baru
-        if os.path.exists(model_save_path):
+        model_exists = os.path.exists(model_save_path)
+        
+        if model_exists:
+            # Jika model sudah ada, load dan update
+            print(f"Loading existing model from {model_save_path}")
             face_recognizer.read(model_save_path)
-
-        face_recognizer.update(faces, np.array(labels))
+            face_recognizer.update(faces, np.array(labels))
+        else:
+            # ✅ Jika model belum ada, train dari awal
+            print(f"Creating new model at {model_save_path}")
+            # Pastikan direktori exists
+            os.makedirs(os.path.dirname(model_save_path), exist_ok=True)
+            face_recognizer.train(faces, np.array(labels))
+        
+        # Save model
         face_recognizer.save(model_save_path)
-        print(np.array(labels))
-        print(f"Data baru untuk user {target_user} ditambahkan ke model dan disimpan di {model_save_path}.")
-
+        print(f"Model saved successfully at {model_save_path}")
+        
         # Update daftar gambar yang telah dilatih
         update_trained_images(log_file, new_images)
     else:
@@ -148,7 +160,7 @@ def train_replace_user_data(training_dir, model_save_path, target_user, target_l
     """
     face_recognizer = cv2.face.LBPHFaceRecognizer.create()
     haar_name='haarcascade_frontalface_default.xml'
-    haar_loc=os.path.join('hasiltraining',haar_name)
+    haar_loc=os.path.join('apps','hasiltraining',haar_name)
     face_cascade = cv2.CascadeClassifier(haar_loc)
 
     log_file = f"{target_user}_trained_images.log"
@@ -213,7 +225,7 @@ def recognize_from_image(image, model_path, label_to_user):
 
     # Load the face detection model
     haar_name='haarcascade_frontalface_default.xml'
-    haar_loc=os.path.join('hasiltraining',haar_name)
+    haar_loc=os.path.join('apps','hasiltraining',haar_name)
     face_cascade = cv2.CascadeClassifier(haar_loc)
 
     # Konversi gambar ke grayscale
@@ -262,6 +274,7 @@ def get_true_label_from_path(image_path):
     return str(label_str)
 
 class Createimagetrainingusernew(APIView):
+    permission_classes=(permissions.AllowAny,)
     parser_classes = [MultiPartParser,FormParser]
     def post(self,request):
         if not _dependencies_available():
@@ -291,7 +304,12 @@ class Createimagetrainingusernew(APIView):
                 serial.save()
                 training_dir=os.path.join('media','imagetraining')
                 model_save='lbph_model.xml'
-                model_save_path=os.path.join('hasiltraining',model_save)
+                model_hasil='haarcascade_frontalface_default.xml'
+                model_save_path=os.path.join('apps','hasiltraining',model_save)
+                # print(f"Training dir: {training_dir}")
+                # print(f"Model path: {model_save_path}")
+                print(f"Folder exists: {os.path.exists(training_dir)}")
+                # print(f"Folder exists: {os.path.exists(model_haar)}")
                 train_or_update_user_data(
                     training_dir=training_dir,
                     model_save_path=model_save_path,
@@ -316,31 +334,52 @@ class Createimagetrainingusernew(APIView):
 
 
 class Getimageexistsuser(APIView):
+    permission_classes=(permissions.AllowAny,)
     def get(self,request):
         username=request.query_params.get("username",None)
+        face_id=(
+            request.query_params.get("face_id")
+            or request.query_params.get("faceID")
+            or request.query_params.get("face_ID")
+            or request.query_params.get("faceid")
+        )
+        if not username and not face_id:
+            return Response({
+                "error":"username atau face_id harus diisi"
+            },status=status.HTTP_400_BAD_REQUEST)
         try:
-            items=User.objects.get(username=username)
+            if username:
+                items=User.objects.get(username=username)
+            else:
+                items=User.objects.get(face_id=face_id)
         except User.DoesNotExist:
             return Response({
-                "error":"username does not exist"
-            },status=status.HTTP_403_FORBIDDEN)
+                "error":"user tidak ditemukan"
+            },status=status.HTTP_404_NOT_FOUND)
         gambarexist=models.Datawajahnew.objects.filter(user_id=items.id)
         print(gambarexist)
-        if not gambarexist:
+        if not gambarexist.exists():
             return Response({
                 "error":"gambar user tidak ditemukan"
-            },status=status.HTTP_403_FORBIDDEN)
-        else:
-            data=serializer.Imagedatawajahserializernew(gambarexist,many=True)
-            return Response(
-                data={
-                    'status':'success',
-                    'message':'gambar user ditemukan',
-                    'data':data.data
-                },status=status.HTTP_200_OK
-            )
+            },status=status.HTTP_404_NOT_FOUND)
+        data=serializer.Imagedatawajahserializernew(gambarexist,many=True)
+        return Response(
+            data={
+                'status':'success',
+                'message':'gambar user ditemukan',
+                'user':{
+                    'username':items.username,
+                    'first_name':items.first_name,
+                    'last_name':items.last_name,
+                    'role':items.role,
+                    'face_id':items.face_id
+                },
+                'data':data.data
+            },status=status.HTTP_200_OK
+        )
 
 class Createlogusersmartnew(APIView):
+    permission_classes=(permissions.AllowAny,)
     parser_classes = [MultiPartParser,FormParser]
     def post(self,request):
         if not _dependencies_available():
@@ -361,7 +400,7 @@ class Createlogusersmartnew(APIView):
             if items.face_id is not None and str(items.face_id).isdigit()
         }
         model_name='lbph_model.xml'
-        model_path=os.path.join('hasiltraining',model_name)
+        model_path=os.path.join('apps','hasiltraining',model_name)
         result=recognize_from_image(image,model_path,label_to_user)
         image_result=[]
         for results in result:
@@ -411,6 +450,7 @@ class Createlogusersmartnew(APIView):
                 },status=status.HTTP_200_OK
             )
 class Getuserlogsmartnews(APIView):
+    permission_classes=(permissions.AllowAny,)
     def get(self,request):
         username=request.query_params.get('username',None)
         items=User.objects.get(username=username)

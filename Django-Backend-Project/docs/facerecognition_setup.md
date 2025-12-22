@@ -14,7 +14,7 @@
 
 4. **Workflow API**  
    - Latih data owner: `POST /api/v1/facerecognition/createimagetrainingusernew/` (`username`, `image_list[]`).  
-   - Verifikasi data: `GET /api/v1/facerecognition/getuserimageexists/?username=...`.  
+   - Verifikasi data: `GET /api/v1/facerecognition/getuserimageexists/?username=...` atau `?face_id=...` (alias legacy `/face/getuserimageexists/`).  
    - Kirim hasil kamera: `POST /api/v1/facerecognition/createlogusersmartnew/` dengan `image`.  
    - Ambil log: `GET /api/v1/facerecognition/getuserlogsmartnew/`.
 

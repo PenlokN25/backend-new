@@ -16,7 +16,10 @@ django-extensions==3.2.3
 gunicorn==21.2.0
 idna==3.10
 kombu==5.5.4
-numpy==1.26.4
+numpy==2.2.6
+opencv-contrib-python==4.12.0.88 
+opencv-python==4.12.0.88 
+opencv-python-headless==4.12.0.88
 packaging==25.0
 paho-mqtt==2.1.0
 psycopg2-binary==2.9.9
